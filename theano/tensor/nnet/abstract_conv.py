@@ -465,10 +465,20 @@ class AbstractConv2d(BaseAbstractConv2d):
         return Apply(self, [img, kern], [output])
 
     def perform(self, node, inp, out_):
-        raise NotImplementedError(
-            'AbstractConv2d theano optimization failed. '
-            'Did you exclude both "conv_dnn" and "conv_gemm" from '
-            'the optimizer? Is cudnn available and does the GPU support it?')
+        old_config = theano.config.compute_test_value
+        theano.config.compute_test_value = 'off'
+
+        im = theano.tensor.tensor4()
+        ker = theano.tensor.tensor4()
+        fconv = AbstractConv2d(self.imshp, self.kshp, self.border_mode,
+                               self.subsample, self.filter_flip)
+        f = theano.function([im, ker], fconv(im, ker))
+        out_[0][0] = f(inp[0], inp[1])
+        theano.config.compute_test_value = old_config
+        # raise NotImplementedError(
+        #     'AbstractConv2d theano optimization failed. '
+        #     'Did you exclude both "conv_dnn" and "conv_gemm" from '
+        #     'the optimizer? Is cudnn available and does the GPU support it?')
 
     def R_op(self, inputs, eval_points):
         rval = None
@@ -656,10 +666,22 @@ class AbstractConv2d_gradInputs(BaseAbstractConv2d):
         return Apply(self, [kern, topgrad, shape], [output])
 
     def perform(self, node, inp, out_):
-        raise NotImplementedError(
-            'AbstractConv2d_gradInputs theano optimization failed. '
-            'Did you exclude both "conv_dnn" and "conv_gemm" from '
-            'the optimizer?')
+        old_config = theano.config.compute_test_value
+        theano.config.compute_test_value = 'off'
+
+        im = theano.tensor.tensor4()
+        ker = theano.tensor.tensor4()
+        shape = theano.tensor.lvector()
+        fconv = AbstractConv2d_gradInputs(self.imshp, self.kshp,
+                                          self.border_mode, self.subsample,
+                                          self.filter_flip)
+        f = theano.function([ker, im, shape], fconv(ker, im, shape))
+        out_[0][0] = f(inp[0], inp[1], inp[2])
+        theano.config.compute_test_value = old_config
+        # raise NotImplementedError(
+        #     'AbstractConv2d_gradInputs theano optimization failed. '
+        #     'Did you exclude both "conv_dnn" and "conv_gemm" from '
+        #     'the optimizer?')
 
     def grad(self, inp, grads):
         weights, top = inp[:2]
